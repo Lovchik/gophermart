@@ -33,7 +33,6 @@ func (s *Service) Refresh(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-
 	c.Header("Authorization", tokens.AccessToken)
 	c.Header("Refresh", tokens.RefreshToken)
 	c.JSON(http.StatusOK, nil)
@@ -62,6 +61,7 @@ func (s *Service) Login(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
+	c.Set("Authorization", tokens.AccessToken)
 	c.Header("Authorization", tokens.AccessToken)
 	c.Header("Refresh", tokens.RefreshToken)
 	c.Status(http.StatusOK)

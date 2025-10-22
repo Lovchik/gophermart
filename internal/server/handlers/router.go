@@ -20,6 +20,9 @@ func UserRegister(router *gin.RouterGroup, s *Service) {
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
+		if token == "" {
+			token, _ = c.Cookie("Authorization")
+		}
 		if token == "" && !utils.IsValidToken(token, "access") {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
