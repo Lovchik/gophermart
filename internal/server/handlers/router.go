@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"github.com/Lovchik/gophermart/internal/server/utils"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -20,6 +21,7 @@ func UserRegister(router *gin.RouterGroup, s *Service) {
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
+		fmt.Println("token: ", token)
 		if token == "" {
 			token, _ = c.Cookie("Authorization")
 		}
