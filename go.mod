@@ -1,4 +1,4 @@
-module gofermart
+module github.com/Lovchik/gophermart
 
 go 1.23.0
 

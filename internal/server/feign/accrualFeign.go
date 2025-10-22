@@ -3,7 +3,7 @@ package feign
 import (
 	"encoding/json"
 	"errors"
-	"gofermart/internal/server/config"
+	"github.com/Lovchik/gophermart/internal/server/config"
 	"io"
 	"net/http"
 )

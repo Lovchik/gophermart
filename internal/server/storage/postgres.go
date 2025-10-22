@@ -3,10 +3,10 @@ package storage
 import (
 	"context"
 	"fmt"
+	"github.com/Lovchik/gophermart/internal/server/feign"
+	"github.com/Lovchik/gophermart/internal/server/models"
 	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
-	"gofermart/internal/server/feign"
-	"gofermart/internal/server/models"
 	"time"
 )
 

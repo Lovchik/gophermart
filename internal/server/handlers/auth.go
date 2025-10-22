@@ -2,11 +2,11 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/Lovchik/gophermart/internal/server/models"
+	"github.com/Lovchik/gophermart/internal/server/storage"
+	"github.com/Lovchik/gophermart/internal/server/utils"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"gofermart/internal/server/models"
-	"gofermart/internal/server/storage"
-	"gofermart/internal/server/utils"
 	"net/http"
 )
 
@@ -16,22 +16,21 @@ type Service struct {
 }
 
 func (s *Service) Refresh(c *gin.Context) {
-	var response models.Response
 	header := c.GetHeader("Refresh")
 	if !utils.IsValidToken(header, "refresh") {
 		log.Info("Неверный токен")
-		c.JSON(http.StatusUnauthorized, response.ErrorResponse("Неверный токен"))
+		c.Status(http.StatusUnauthorized)
 		return
 	}
 	id, err := utils.GetUserID(header)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ErrorResponse(err.Error()))
+		c.Status(http.StatusBadRequest)
 		return
 	}
 
 	tokens, err := utils.GenerateJWT(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ErrorResponse(err.Error()))
+		c.Status(http.StatusBadRequest)
 		return
 	}
 
@@ -41,62 +40,51 @@ func (s *Service) Refresh(c *gin.Context) {
 }
 
 func (s *Service) Login(c *gin.Context) {
-	var response models.Response
 	var credentials models.LoginRequest
 	err := c.ShouldBind(&credentials)
 	if err != nil {
 		fmt.Println(err)
-		c.JSON(http.StatusBadRequest, response.ErrorResponse("Неверные параметры тела запроса"))
+		c.Status(http.StatusBadRequest)
 		return
 	}
 	err = utils.Validate().Struct(credentials)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ErrorResponse("Должны быть заполнены логин и пароль"))
+		c.Status(http.StatusBadRequest)
 		return
 	}
 	user, err := s.Store.GetUserByCreds(credentials)
 	if err != nil || user.ID == 0 {
-		c.JSON(http.StatusUnauthorized, response.ErrorResponse("Неверная пара логин/пароль"))
+		c.Status(http.StatusUnauthorized)
 		return
 	}
 	tokens, err := utils.GenerateJWT(user.ID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ErrorResponse(err.Error()))
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 	c.Header("Authorization", tokens.AccessToken)
 	c.Header("Refresh", tokens.RefreshToken)
-	c.JSON(http.StatusOK, nil)
+	c.Status(http.StatusOK)
 }
 
 func (s *Service) RegisterUser(c *gin.Context) {
-	var response models.Response
 	var request models.LoginRequest
 	err := c.ShouldBind(&request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ErrorResponse(err.Error()))
+		c.Status(http.StatusBadRequest)
 		return
 	}
 
 	exists := s.Store.IsUserExists(request)
 	if exists {
-		c.JSON(http.StatusConflict, nil)
+		c.Status(http.StatusConflict)
 		return
 	}
 
-	user, err := s.Store.CreateUser(request)
+	_, err = s.Store.CreateUser(request)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.ErrorResponse(err.Error()))
+		c.Status(http.StatusInternalServerError)
 		return
 	}
-
-	tokens, err := utils.GenerateJWT(user.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.ErrorResponse(err.Error()))
-		return
-	}
-
-	c.Header("Authorization", tokens.AccessToken)
-	c.Header("Refresh", tokens.RefreshToken)
-	c.JSON(http.StatusOK, response.NewWithMessage(request, ""))
+	c.Status(http.StatusOK)
 }

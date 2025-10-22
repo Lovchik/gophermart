@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"github.com/Lovchik/gophermart/internal/server/config"
 	log "github.com/sirupsen/logrus"
-	"gofermart/internal/server/config"
 )
 
 type JwtKeysPair struct {

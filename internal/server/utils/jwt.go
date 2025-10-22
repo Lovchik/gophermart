@@ -2,9 +2,9 @@ package utils
 
 import (
 	"fmt"
+	"github.com/Lovchik/gophermart/internal/server/models"
 	"github.com/golang-jwt/jwt"
 	log "github.com/sirupsen/logrus"
-	"gofermart/internal/server/models"
 	"strconv"
 	"time"
 )

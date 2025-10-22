@@ -2,125 +2,120 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/Lovchik/gophermart/internal/server/models"
+	"github.com/Lovchik/gophermart/internal/server/utils"
 	"github.com/gin-gonic/gin"
-	"gofermart/internal/server/models"
-	"gofermart/internal/server/utils"
 	"io"
 	"net/http"
 	"strconv"
 )
 
 func (s *Service) CreateOrders(c *gin.Context) {
-	var response models.Response
 	bodyBytes, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ErrorResponse("Неверный формат запроса"))
+		c.Status(http.StatusBadRequest)
 	}
 	c.Request.Body.Close()
 	orderNumber := string(bodyBytes)
 
 	if !validateOrderNumber(orderNumber) {
-		c.JSON(http.StatusUnprocessableEntity, response.ErrorResponse("Неверный формат запроса"))
+		c.Status(http.StatusUnprocessableEntity)
 		return
 	}
 	userID, err := utils.GetUserID(c.GetHeader("Authorization"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.ErrorResponse("Внутренняя ошибка сервера."))
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 	ownerID, exists := s.Store.GetOrderOwner(orderNumber)
 	if exists {
 		if ownerID == userID {
-			c.JSON(http.StatusOK, response.NewWithMessage(nil, "номер заказа уже был загружен этим пользователем"))
+			c.Status(http.StatusOK)
 			return
 		}
-		c.JSON(http.StatusConflict, response.NewWithMessage(nil, "номер заказа уже был загружен другим пользователем"))
+		c.Status(http.StatusConflict)
 		return
 	}
 	err = s.Store.CreateOrder(orderNumber, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.ErrorResponse("Внутренняя ошибка сервера."))
+		c.Status(http.StatusInternalServerError)
 		return
 	}
-	c.JSON(http.StatusAccepted, response.NewWithMessage(nil, "новый номер заказа принят в обработку"))
+	c.Status(http.StatusAccepted)
 }
 
 func (s *Service) GetOrders(context *gin.Context) {
-	var response models.Response
 	userID, err := utils.GetUserID(context.GetHeader("Authorization"))
 	if err != nil {
-		context.JSON(http.StatusUnauthorized, response.ErrorResponse("Не авторизированный пользователь"))
+		context.Status(http.StatusUnauthorized)
 		return
 	}
 	orders, err := s.Store.GetOrders(userID)
 	if err != nil {
-		fmt.Println(err)
-		context.JSON(http.StatusInternalServerError, response.ErrorResponse("Внутренняя ошибка сервера."))
+		context.Status(http.StatusInternalServerError)
 		return
 	}
 	if len(orders) == 0 {
-		context.JSON(http.StatusNoContent, response.NewWithMessage(orders, "Успешно получено"))
+		context.Status(http.StatusNoContent)
 		return
 	}
 
-	context.JSON(http.StatusOK, response.NewWithMessage(orders, "Успешно получено"))
+	context.JSON(http.StatusOK, orders)
 }
 
 func (s *Service) CreateWithdraw(context *gin.Context) {
-	var response models.Response
 	var order models.CreateWithdrawalOrder
 	err := context.ShouldBind(&order)
 	if err != nil {
 		fmt.Println(err)
-		context.JSON(http.StatusBadRequest, response.ErrorResponse("Неверные параметры тела запроса"))
+		context.Status(http.StatusBadRequest)
 		return
 	}
 	err = utils.Validate().Struct(order)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, response.ErrorResponse("Поля обязательны"))
+		context.Status(http.StatusBadRequest)
 		return
 	}
 	if validateOrderNumber(order.Order) {
-		context.JSON(http.StatusUnprocessableEntity, response.ErrorResponse("Неверный формат запроса"))
+		context.Status(http.StatusUnprocessableEntity)
 		return
 	}
 	userID, err := utils.GetUserID(context.GetHeader("Authorization"))
 	if err != nil {
-		context.JSON(http.StatusUnauthorized, response.ErrorResponse("Пользователь не авторизован"))
+		context.Status(http.StatusUnauthorized)
 		return
 	}
 	balance, err := s.Store.GetActualBalance(userID)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, response.ErrorResponse("Внутренняя ошибка сервера."))
+		context.Status(http.StatusInternalServerError)
 		return
 	}
 	if balance-order.Sum < 0 {
-		context.JSON(http.StatusPaymentRequired, response.ErrorResponse("на счету недостаточно средств"))
+		context.Status(http.StatusPaymentRequired)
 		return
 	}
 	err = s.Store.CreateWithdrawalOrder(order, userID)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, response.ErrorResponse("Внутренняя ошибка сервера."))
+		context.Status(http.StatusInternalServerError)
 		return
 	}
-	context.JSON(http.StatusOK, response.ErrorResponse("успешная обработка запроса"))
+	context.Status(http.StatusOK)
 }
 
 func (s *Service) GetBalance(context *gin.Context) {
-	var response models.Response
 	userID, err := utils.GetUserID(context.GetHeader("Authorization"))
 	if err != nil {
-		context.JSON(http.StatusUnauthorized, response.ErrorResponse("Пользователь не авторизован"))
+		context.Status(http.StatusUnauthorized)
 		return
 	}
 	withdraw, err := s.Store.GetWithdraw(userID)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, response.ErrorResponse("Серверная ошибка"))
+		context.Status(http.StatusInternalServerError)
 		return
 	}
 	bonuses, err := s.Store.GetBonuses(userID)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, response.ErrorResponse("Серверная ошибка"))
+		context.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -128,24 +123,23 @@ func (s *Service) GetBalance(context *gin.Context) {
 }
 
 func (s *Service) GetWithdrawals(context *gin.Context) {
-	var response models.Response
 	userID, err := utils.GetUserID(context.GetHeader("Authorization"))
 	if err != nil {
-		context.JSON(http.StatusUnauthorized, response.ErrorResponse("Не авторизированный пользователь"))
+		context.Status(http.StatusUnauthorized)
 		return
 	}
 	orders, err := s.Store.GetWithdrawalOrders(userID)
 	if err != nil {
 		fmt.Println(err)
-		context.JSON(http.StatusInternalServerError, response.ErrorResponse("Внутренняя ошибка сервера."))
+		context.Status(http.StatusInternalServerError)
 		return
 	}
 	if len(orders) == 0 {
-		context.JSON(http.StatusNoContent, response.NewWithMessage(orders, "Успешно получено"))
+		context.Status(http.StatusNoContent)
 		return
 	}
 
-	context.JSON(http.StatusOK, response.NewWithMessage(orders, "Успешно получено"))
+	context.JSON(http.StatusOK, orders)
 }
 
 func validateOrderNumber(orderNumber string) bool {

@@ -1,6 +1,6 @@
 package storage
 
-import "gofermart/internal/server/models"
+import "github.com/Lovchik/gophermart/internal/server/models"
 
 type Storage interface {
 	HealthCheck() error

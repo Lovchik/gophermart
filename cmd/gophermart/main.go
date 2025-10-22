@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
+	"github.com/Lovchik/gophermart/internal/server/config"
+	"github.com/Lovchik/gophermart/internal/server/handlers"
+	"github.com/Lovchik/gophermart/internal/server/models"
+	"github.com/Lovchik/gophermart/internal/server/storage"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"gofermart/internal/server/config"
-	"gofermart/internal/server/handlers"
-	"gofermart/internal/server/models"
-	"gofermart/internal/server/storage"
 )
 
 func main() {

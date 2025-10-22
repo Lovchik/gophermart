@@ -1,9 +1,8 @@
 package handlers
 
 import (
+	"github.com/Lovchik/gophermart/internal/server/utils"
 	"github.com/gin-gonic/gin"
-	"gofermart/internal/server/models"
-	"gofermart/internal/server/utils"
 	"net/http"
 )
 
@@ -20,16 +19,14 @@ func UserRegister(router *gin.RouterGroup, s *Service) {
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var response models.Response
 		token := c.GetHeader("Authorization")
 		if token == "" && !utils.IsValidToken(token, "access") {
-			c.JSON(http.StatusUnauthorized, response.ErrorResponse("Неверный токен"))
-			c.Abort()
+			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 		userID, err := utils.GetUserID(token)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, response.ErrorResponse("Ошибка получения пользователя"))
+			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 		c.Set("user_id", userID)
