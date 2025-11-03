@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"github.com/Lovchik/gophermart/internal/server/models"
-	"github.com/Lovchik/gophermart/internal/server/utils"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -17,7 +16,7 @@ func (s *Service) CreateOrders(c *gin.Context) {
 	}
 	c.Request.Body.Close()
 	orderNumber := string(bodyBytes)
-	userID, err := utils.GetUserID(c.GetHeader("Authorization"))
+	userID, err := s.JwtKeysPair.GetUserID(c.GetHeader("Authorization"))
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -35,7 +34,13 @@ func (s *Service) CreateOrders(c *gin.Context) {
 		c.Status(http.StatusUnprocessableEntity)
 		return
 	}
-	err = s.Store.CreateOrder(orderNumber, userID)
+	info, err := s.Feign.GetBonusInfo(orderNumber)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	err = s.Store.CreateOrder(orderNumber, userID, info)
 	if err != nil {
 		log.Println(err)
 		c.Status(http.StatusInternalServerError)
@@ -45,7 +50,7 @@ func (s *Service) CreateOrders(c *gin.Context) {
 }
 
 func (s *Service) GetOrders(context *gin.Context) {
-	userID, err := utils.GetUserID(context.GetHeader("Authorization"))
+	userID, err := s.JwtKeysPair.GetUserID(context.GetHeader("Authorization"))
 	if err != nil {
 		context.Status(http.StatusUnauthorized)
 		return
@@ -71,7 +76,7 @@ func (s *Service) CreateWithdraw(context *gin.Context) {
 		context.Status(http.StatusBadRequest)
 		return
 	}
-	err = utils.Validate().Struct(order)
+	err = s.Validator.Struct(order)
 	if err != nil {
 		context.Status(http.StatusBadRequest)
 		return
@@ -80,7 +85,7 @@ func (s *Service) CreateWithdraw(context *gin.Context) {
 		context.Status(http.StatusUnprocessableEntity)
 		return
 	}
-	userID, err := utils.GetUserID(context.GetHeader("Authorization"))
+	userID, err := s.JwtKeysPair.GetUserID(context.GetHeader("Authorization"))
 	if err != nil {
 		context.Status(http.StatusUnauthorized)
 		return
@@ -103,7 +108,7 @@ func (s *Service) CreateWithdraw(context *gin.Context) {
 }
 
 func (s *Service) GetBalance(context *gin.Context) {
-	userID, err := utils.GetUserID(context.GetHeader("Authorization"))
+	userID, err := s.JwtKeysPair.GetUserID(context.GetHeader("Authorization"))
 	if err != nil {
 		context.Status(http.StatusUnauthorized)
 		return
@@ -123,7 +128,7 @@ func (s *Service) GetBalance(context *gin.Context) {
 }
 
 func (s *Service) GetWithdrawals(context *gin.Context) {
-	userID, err := utils.GetUserID(context.GetHeader("Authorization"))
+	userID, err := s.JwtKeysPair.GetUserID(context.GetHeader("Authorization"))
 	if err != nil {
 		context.Status(http.StatusUnauthorized)
 		return

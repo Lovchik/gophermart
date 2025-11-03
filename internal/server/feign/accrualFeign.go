@@ -3,12 +3,19 @@ package feign
 import (
 	"encoding/json"
 	"errors"
-	"github.com/Lovchik/gophermart/internal/server/config"
 	"github.com/Lovchik/gophermart/internal/server/retry"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 )
+
+type AccuralFeing struct {
+	AccuralSystemAddress string
+}
+
+func NewAccuralFeign(adress string) (*AccuralFeing, error) {
+	return &AccuralFeing{AccuralSystemAddress: adress}, nil
+}
 
 type BonusInfo struct {
 	Order   *string  `json:"order"`
@@ -16,10 +23,10 @@ type BonusInfo struct {
 	Accrual *float64 `json:"accrual"`
 }
 
-func GetBonusInfo(orderNumber string) (BonusInfo, error) {
+func (ac AccuralFeing) GetBonusInfo(orderNumber string) (BonusInfo, error) {
 	var bonusInfo BonusInfo
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", config.GetConfig().AccuralSystemAddress+"/api/orders/"+orderNumber, nil) // Example PUT request
+	req, err := http.NewRequest("GET", ac.AccuralSystemAddress+"/api/orders/"+orderNumber, nil)
 	if err != nil {
 		return BonusInfo{}, err
 	}

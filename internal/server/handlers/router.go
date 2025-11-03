@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"github.com/Lovchik/gophermart/internal/server/utils"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -10,24 +9,24 @@ func UserRegister(router *gin.RouterGroup, s *Service) {
 	router.POST("/refresh", s.Refresh)
 	router.POST("/login", s.Login)
 	router.POST("/register", s.RegisterUser)
-	router.POST("/orders", AuthMiddleware(), s.CreateOrders)
-	router.GET("/orders", AuthMiddleware(), s.GetOrders)
-	router.GET("/balance", AuthMiddleware(), s.GetBalance)
-	router.POST("/balance/withdraw", AuthMiddleware(), s.CreateWithdraw)
-	router.GET("/withdrawals", AuthMiddleware(), s.GetWithdrawals)
+	router.POST("/orders", s.AuthMiddleware(), s.CreateOrders)
+	router.GET("/orders", s.AuthMiddleware(), s.GetOrders)
+	router.GET("/balance", s.AuthMiddleware(), s.GetBalance)
+	router.POST("/balance/withdraw", s.AuthMiddleware(), s.CreateWithdraw)
+	router.GET("/withdrawals", s.AuthMiddleware(), s.GetWithdrawals)
 }
 
-func AuthMiddleware() gin.HandlerFunc {
+func (s *Service) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
 		if token == "" {
 			token, _ = c.Cookie("Authorization")
 		}
-		if token == "" && !utils.IsValidToken(token, "access") {
+		if token == "" && !s.JwtKeysPair.IsValidToken(token, "access") {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		userID, err := utils.GetUserID(token)
+		userID, err := s.JwtKeysPair.GetUserID(token)
 		if err != nil {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return

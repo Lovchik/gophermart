@@ -1,33 +1,40 @@
 package handlers
 
 import (
+	"github.com/Lovchik/gophermart/internal/server/config"
+	"github.com/Lovchik/gophermart/internal/server/feign"
 	"github.com/Lovchik/gophermart/internal/server/models"
 	"github.com/Lovchik/gophermart/internal/server/storage"
 	"github.com/Lovchik/gophermart/internal/server/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 )
 
 type Service struct {
-	WebServer *gin.Engine
-	Store     storage.Storage
+	WebServer   *gin.Engine
+	Store       storage.Storage
+	Config      config.Config
+	JwtKeysPair utils.JwtKeysPair
+	Feign       feign.Feign
+	Validator   *validator.Validate
 }
 
 func (s *Service) Refresh(c *gin.Context) {
 	header := c.GetHeader("Refresh")
-	if !utils.IsValidToken(header, "refresh") {
+	if !s.JwtKeysPair.IsValidToken(header, "refresh") {
 		log.Info("Неверный токен")
 		c.Status(http.StatusUnauthorized)
 		return
 	}
-	id, err := utils.GetUserID(header)
+	id, err := s.JwtKeysPair.GetUserID(header)
 	if err != nil {
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	tokens, err := utils.GenerateJWT(id)
+	tokens, err := s.JwtKeysPair.GenerateJWT(id)
 	if err != nil {
 		c.Status(http.StatusBadRequest)
 		return
@@ -45,7 +52,7 @@ func (s *Service) Login(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	err = utils.Validate().Struct(credentials)
+	err = s.Validator.Struct(credentials)
 	if err != nil {
 		c.Status(http.StatusBadRequest)
 		return
@@ -55,7 +62,7 @@ func (s *Service) Login(c *gin.Context) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}
-	tokens, err := utils.GenerateJWT(user.ID)
+	tokens, err := s.JwtKeysPair.GenerateJWT(user.ID)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -87,7 +94,7 @@ func (s *Service) RegisterUser(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-	tokens, err := utils.GenerateJWT(user.ID)
+	tokens, err := s.JwtKeysPair.GenerateJWT(user.ID)
 	if err != nil {
 		log.Error(err)
 		c.Status(http.StatusInternalServerError)

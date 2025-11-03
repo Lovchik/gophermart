@@ -10,11 +10,30 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 	"time"
 )
 
 type PostgresStorage struct {
 	Conn *pgxpool.Pool
+}
+
+func (p PostgresStorage) Close(ctx context.Context) error {
+	if p.Conn == nil {
+		return nil
+	}
+	done := make(chan struct{})
+	go func() {
+		p.Conn.Close()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (p PostgresStorage) GetWithdrawalOrders(userID int64) ([]models.WithdrawalOrders, error) {
@@ -90,8 +109,13 @@ func (p PostgresStorage) CreateWithdrawalOrder(order models.CreateWithdrawalOrde
 
 func (p PostgresStorage) GetUserByCreds(login models.LoginRequest) (models.User, error) {
 	var user models.User
-	query := `SELECT id,login FROM users WHERE login = $1 AND password = $2 LIMIT 1`
-	err := p.Conn.QueryRow(context.Background(), query, login.Login, login.Password).Scan(&user.ID, &user.Login)
+	query := `SELECT id,login,password FROM users WHERE login = $1  LIMIT 1`
+	err := p.Conn.QueryRow(context.Background(), query, login.Login).Scan(&user.ID, &user.Login, &user.Pass)
+	if err != nil {
+		return models.User{}, err
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(login.Password))
+
 	if err != nil {
 		log.Println(err)
 		return models.User{}, err
@@ -137,14 +161,10 @@ func (p PostgresStorage) GetOrderOwner(orderNumber string) (int64, bool) {
 	return userID, true
 }
 
-func (p PostgresStorage) CreateOrder(orderNumber string, userID int64) error {
+func (p PostgresStorage) CreateOrder(orderNumber string, userID int64, info feign.BonusInfo) error {
 	var result int64
 	var status string
 	var accrual *float64
-	info, err := feign.GetBonusInfo(orderNumber)
-	if err != nil {
-		return err
-	}
 	if info.Status == nil {
 		status = "NEW"
 	} else {
@@ -155,7 +175,7 @@ func (p PostgresStorage) CreateOrder(orderNumber string, userID int64) error {
 	}
 
 	query := `INSERT INTO orders (user_id, number,status,accrual) VALUES ($1,$2,$3,$4) RETURNING id`
-	err = p.Conn.QueryRow(context.Background(), query, userID, orderNumber, status, accrual).Scan(&result)
+	err := p.Conn.QueryRow(context.Background(), query, userID, orderNumber, status, accrual).Scan(&result)
 	if err != nil {
 		return err
 	}
@@ -164,8 +184,8 @@ func (p PostgresStorage) CreateOrder(orderNumber string, userID int64) error {
 
 func (p PostgresStorage) IsUserExists(request models.LoginRequest) bool {
 	var exists bool
-	query := `SELECT EXISTS(SELECT 1 FROM users WHERE login = $1 AND password = $2)`
-	err := p.Conn.QueryRow(context.Background(), query, request.Login, request.Password).Scan(&exists)
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE login = $1)`
+	err := p.Conn.QueryRow(context.Background(), query, request.Login).Scan(&exists)
 	if err != nil {
 		return false
 	}
@@ -175,7 +195,7 @@ func (p PostgresStorage) IsUserExists(request models.LoginRequest) bool {
 func (p PostgresStorage) CreateUser(request models.LoginRequest) (models.User, error) {
 	var user models.User
 	query := `INSERT INTO users (login, password) VALUES ($1, $2) RETURNING id,login`
-	err := p.Conn.QueryRow(context.Background(), query, request.Login, request.Password).Scan(&user.ID, &user.Login)
+	err := p.Conn.QueryRow(context.Background(), query, request.Login, hashPass(request.Password)).Scan(&user.ID, &user.Login)
 	if err != nil {
 		return models.User{}, err
 	}
@@ -221,4 +241,9 @@ func (p PostgresStorage) HealthCheck() error {
 		return err
 	}
 	return nil
+}
+
+func hashPass(pass string) string {
+	bytes, _ := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.MinCost)
+	return string(bytes)
 }
